@@ -1,132 +1,131 @@
-// import React from 'react';
-// import bg from "./img.jpg";
-// import axios from "axios"
-// const Stocks = () => {
-
-//   const [price,setPrice] = useState(null)
-//   const [symbol,setSymbol] = useState("")
-//   const [error,setError] = useState("")
-
-//   const fetchPrice = async => {
-//     if(!symbol)
-//     {
-//       setError("Please enter a valid stock name")
-//       return
-//     }
-//     setError("")
-
-//     const API_KEY = "cuji829r01qm7p9o6qtgcuji829r01qm7p9o6qu0"
-//     const URL = "https://finnhub.io/api/v1/quote?symbol=${symbol.toUpperCase()}&token=${API_KEY}"
-
-//     try
-//     {
-//       const response = await axios.get(URL);
-//       setPrice(response.data.c || "No data avilable")
-//     }
-//     catch(err){
-//       setError("Cannot fetch the stock price due to invalid stock symbol")
-//     }
-//   }
-  
-  
-//     return (
-//     //<div className=' bg-red-300 flex items-center justify-center'>
-//         <div className="min-h-screen p-10 text-white items-center justify-center"
-//           style ={{
-//               backgroundImage: `url(${bg})`,
-//               backgroundSize: "cover",
-//               backgroundPosition: "center", }}>
-//             <div className="text-4xl font-bold text-white ">Stock Zen</div>
-//               <div className="rounded-lg shadow-lg p-40 bg-white bg-opacity-50">
-//                   <input
-//                   type = "text"
-//                   placeholder='Enter stock symbol (like AAPL)'
-//                   value = {symbol}
-//                   onChange={(e)=>setSymbol(e.target.value)}
-//                   />
-//                   <button onClick={fetchPrice}>Check Price</button>
-
-//                   {price!==}
-//               </div>
-            
-//           </div>
-
-//     //</div>
-
-//   )
-// }
-
-// export default Stocks
-
 import React, { useState } from "react";
-import { sampleSearchResults } from "../consts/sample";
-import { mockCompanyDetails } from "../consts/sample";
+
+const basePath = "https://finnhub.io/api/v1";
+const API_KEY = process.env.REACT_APP_FINNHUB_API_KEY; 
+
+
+console.log("API Key:", process.env.REACT_APP_FINNHUB_API_KEY);
+
 
 const Stocks = () => {
   const [input, setInput] = useState("");
-  const [matches, setMatches] = useState(sampleSearchResults.result); // Fix reference to 'result'
+  const [matches, setMatches] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [stockPrice, setStockPrice] = useState(null);
+  const [companyDetails, setCompanyDetails] = useState(null);
 
-  // Function to handle live search
-  const handleSearch = (event) => {
+  // Function to fetch stock search results
+  const searchSymbol = async (query) => {
+    try {
+      const url = `${basePath}/search?q=${query}&token=${API_KEY}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Error: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error("Stock search failed:", error);
+      return { result: [] };
+    }
+  };
+
+  // Function to fetch company details
+  const fetchDetails = async (stockSymbol) => {
+    try {
+      const url = `${basePath}/stock/profile2?symbol=${stockSymbol}&token=${API_KEY}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Error: ${response.status}`);
+      const data = await response.json();
+      setCompanyDetails(data);
+    } catch (error) {
+      console.error("Company details fetch failed:", error);
+      setCompanyDetails(null);
+    }
+  };
+
+  // Function to fetch real-time stock price
+  const fetchStockPrice = async (stockSymbol) => {
+    try {
+      const url = `${basePath}/quote?symbol=${stockSymbol}&token=${API_KEY}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Error: ${response.status}`);
+      const data = await response.json();
+      setStockPrice(data.c); // 'c' represents the current price in Finnhub API
+    } catch (error) {
+      console.error("Stock price fetch failed:", error);
+      setStockPrice(null);
+    }
+  };
+
+  // Handle input change & fetch matching symbols
+  const handleSearch = async (event) => {
     const query = event.target.value;
     setInput(query);
 
     if (query.trim() === "") {
-      setMatches(sampleSearchResults.result); // Reset results if input is empty
-    } else {
-      const filteredResults = sampleSearchResults.result.filter(
-        (stock) =>
-          stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
-          stock.displaySymbol.toLowerCase().includes(query.toLowerCase()) ||
-          stock.description.toLowerCase().includes(query.toLowerCase())
-      );
-      setMatches(filteredResults);
+      setMatches([]);
+      setShowDropdown(false);
+      return;
     }
+
+    const data = await searchSymbol(query);
+    setMatches(data.result || []);
+    setShowDropdown(true);
   };
 
-  // Function to clear input and reset results
-  const clear = () => {
-    setInput("");
-    setMatches(sampleSearchResults.result);
+  // Handle selection from dropdown
+  const handleSelect = async (symbol) => {
+    setInput(symbol);
+    setMatches([]);
+    setShowDropdown(false);
+    fetchDetails(symbol); // Get company details
+    fetchStockPrice(symbol); // Get real-time price
   };
 
   return (
     <div className="p-10 flex flex-col min-h-screen bg-green-200 items-center justify-center space-y-5">
-      <h1 className="text-3xl">Enter the Stock symbol you want to check:</h1>
+      <h1 className="text-3xl">Select or Search for a Stock Symbol:</h1>
 
-      <div className="flex items-center space-x-2">
+      <div className="relative w-full max-w-xs">
         <input
-          className="rounded-lg shadow-lg bg-white p-5 px-4 py-2 w-full max-w-xs"
+          className="rounded-lg shadow-lg bg-white px-4 py-2 w-full"
           type="text"
           value={input}
-          placeholder="Search by stock symbol..."
+          placeholder="Search or select stock..."
           onChange={handleSearch}
+          onFocus={() => setShowDropdown(true)}
         />
-        <button
-          onClick={clear}
-          className="p-5 bg-red-500 hover:bg-red-700 px-4 py-2 rounded"
-        >
-          Clear
-        </button>
+
+        {/* Dropdown Search Results */}
+        {showDropdown && matches.length > 0 && (
+          <ul className="absolute w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 z-10">
+            {matches.map((stock) => (
+              <li
+                key={stock.symbol}
+                className="p-2 hover:bg-gray-100 cursor-pointer border-b last:border-0"
+                onClick={() => handleSelect(stock.symbol)}
+              >
+                <strong>{stock.displaySymbol}</strong> - {stock.description} ({stock.type})
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
-      {/* Display search results */}
-      {matches.length > 0 && (
-        <ul className="bg-white rounded shadow-lg p-4 w-full max-w-xs">
-          {matches.map((stock) => (
-            <li key={stock.symbol} className="p-2 border-b last:border-0">
-              <strong>{stock.displaySymbol}</strong> - {stock.description} ({stock.type})
-            </li>
-          ))}
-        </ul>
+      {/* Stock Details */}
+      {companyDetails && (
+        <div className="p-5 bg-white rounded-lg shadow-lg mt-5">
+          <h2 className="text-xl font-bold">{companyDetails.name}</h2>
+          <p><strong>Industry:</strong> {companyDetails.finnhubIndustry}</p>
+          <p><strong>Market Cap:</strong> ${companyDetails.marketCapitalization}M</p>
+          <p><strong>Exchange:</strong> {companyDetails.exchange}</p>
+        </div>
       )}
 
-      {/* Stock details */}
-      <div className="h-screen grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 grid-rows-8 md:grid-rows-7">
-        <div className="col-span-1 row-span-1">
-          <h1 className="text-xl font-bold">{mockCompanyDetails.name}</h1>
+      {/* Real-Time Stock Price */}
+      {stockPrice !== null && (
+        <div className="p-5 bg-blue-500 text-white rounded-lg shadow-lg mt-5 text-center">
+          <h2 className="text-2xl font-bold">Current Price: ${stockPrice}</h2>
         </div>
-      </div>
+      )}
     </div>
   );
 };
