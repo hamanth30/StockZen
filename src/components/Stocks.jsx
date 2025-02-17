@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 
 const basePath = "https://finnhub.io/api/v1";
-const API_KEY = process.env.REACT_APP_FINNHUB_API_KEY; 
+const API_KEY = import.meta.env.VITE_API_KEY;
 
 
-console.log("API Key:", process.env.REACT_APP_FINNHUB_API_KEY);
+console.log("API Key:", import.meta.env.VITE_API_KEY);
+
 
 
 const Stocks = () => {
